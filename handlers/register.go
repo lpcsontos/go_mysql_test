@@ -62,7 +62,6 @@ func Register(w http.ResponseWriter, r *http.Request){
 		http.Error(w,"Cannot create user:", http.StatusInternalServerError)
 	}
 
-	fmt.Printf("Beküldött név: %s, jelszó: %s\n", name, password)
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 

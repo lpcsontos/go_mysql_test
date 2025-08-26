@@ -58,14 +58,26 @@ func Setup(){
 	CREATE TABLE IF NOT EXISTS users (
 		id INT AUTO_INCREMENT PRIMARY KEY,
 		name VARCHAR(20) NOT NULL,
-		password VARCHAR(60) NOT NULL,
-		sessionToken VARCHAR(44),
-		csrfToken VARCHAR(44)
+		password VARCHAR(60) NOT NULL
 	);`
 
 	_, err = DB.Exec(createTableQuery)
 	if err != nil {
 		log.Fatal("Cannot create users table:", err)
+	}
+
+	createTokenQuery := `
+	CREATE TABLE IF NOT EXISTS tokens (
+		id INT,
+		sessionToken VARCHAR(44),
+		sessionExpires DATETIME,
+		csrfToken VARCHAR(44),
+		csrfExpires DATETIME
+	);`
+	
+	_, err = DB.Exec(createTokenQuery)
+	if err != nil {
+		log.Fatal("Cannot create tokens table:", err)
 	}
    
 	fmt.Println("Succesful setup")

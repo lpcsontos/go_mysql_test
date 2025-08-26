@@ -5,7 +5,7 @@ import(
 	_"fmt"
    "log"
    "net/http"
-	"strings"
+	"time"
 	_ "os"
 	_ "github.com/joho/godotenv"
    _ "github.com/go-sql-driver/mysql"
@@ -53,17 +53,27 @@ func IsLoggedIn(r *http.Request) bool {
 		return false
 	}
 
-	var sst string
-	qerr = DB.QueryRow("SELECT sessionToken FROM users WHERE name = ?", username).Scan(&sst)
+	st, err := r.Cookie("session_token")
+	if err != nil || st.Value == ""{
+		return false
+	}
+
+	var sessionExpiresSTR string
+	qerr = DB.QueryRow("SELECT sessionExpires FROM tokens WHERE id = (select id from users where name = ?) AND sessionToken = ?", username, st.Value).Scan(&sessionExpiresSTR)
 	if qerr != nil{
 		log.Println("User not found:", qerr)
 		return false
 	}
-
-	st, err := r.Cookie("session_token")
-	if err != nil || st.Value == "" || st.Value != sst{
-		return false
+	sessionExpires, err := time.Parse("2006-01-02 15:04:05", sessionExpiresSTR)
+	if err != nil {
+   	log.Println("Time parse error:", err)
+   	return false
 	}
+
+	if time.Now().After(sessionExpires) {
+      log.Println("Session expired for user:", username)
+		return false
+   }
 	return true
 }
 
@@ -83,14 +93,41 @@ const csrfHeaderName = "X-CSRF-Token"
 
 func CSRFMiddleware(next http.HandlerFunc) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
+			user, err := r.Cookie("user")
+			if err != nil{
+				log.Println("User cookie not found:", err)
+            http.Error(w, "User cookie not found", http.StatusForbidden)
+				return
+			}
+			username := user.Value
+
          cookie, err := r.Cookie(csrfCookieName)
          if err != nil || cookie.Value == "" {
             http.Error(w, "Missing CSRF cookie", http.StatusForbidden)
          	return
          }
 
+			var csrfExpiresSTR string
+			qerr := DB.QueryRow("SELECT csrfExpires FROM tokens WHERE id = (select id from users where name = ?) AND csrfToken = ?", username, cookie.Value).Scan(&csrfExpiresSTR)
+			if qerr != nil{
+				log.Println("Token not found:", qerr)
+            http.Error(w, "Invalid CSRF cookie", http.StatusForbidden)
+				return
+			}
+			csrfExpires, err := time.Parse("2006-01-02 15:04:05", csrfExpiresSTR)
+			if err != nil {
+    			log.Println("Time parse error:", err)
+    			return
+			}
+
+			if time.Now().After(csrfExpires) {
+      		log.Println("csrf expired for user:", username)
+            http.Error(w, "Expired CSRF token", http.StatusForbidden)
+				return
+   		}
+
          headerToken := r.Header.Get(csrfHeaderName)
-			if headerToken == "" || !strings.EqualFold(headerToken, cookie.Value) {
+			if headerToken == "" || headerToken != cookie.Value{
 				log.Println(headerToken + " : " + cookie.Value) 
 				http.Error(w, "Invalid CSRF token", http.StatusForbidden)
 				return
