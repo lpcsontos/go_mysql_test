@@ -26,8 +26,10 @@ func main() {
 	mux.HandleFunc("/register", handlers.RegHand)
 	mux.HandleFunc("/submit_login", handlers.Login)
 	mux.HandleFunc("/submit_reg", handlers.Register)
+	mux.HandleFunc("/test", utils.Auth(handlers.TestHand))
+	mux.HandleFunc("/logout", utils.CSRFMiddleware(handlers.LogoutHand))
 
-   err = http.ListenAndServe(":8080", mux)
+   err = http.ListenAndServeTLS(":8080", "cert.pem", "key.pem", mux)
    if err != nil {
        log.Fatalf("Server error: %v", err)
    }

@@ -58,7 +58,9 @@ func Setup(){
 	CREATE TABLE IF NOT EXISTS users (
 		id INT AUTO_INCREMENT PRIMARY KEY,
 		name VARCHAR(20) NOT NULL,
-		password VARCHAR(60) NOT NULL
+		password VARCHAR(60) NOT NULL,
+		sessionToken VARCHAR(44),
+		csrfToken VARCHAR(44)
 	);`
 
 	_, err = DB.Exec(createTableQuery)

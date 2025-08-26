@@ -4,6 +4,7 @@ import (
 	"db_test/utils"
    _ "database/sql"
 	"fmt"
+	"time"
    "log"
    "net/http"
 	_ "os"
@@ -51,7 +52,48 @@ func Login(w http.ResponseWriter, r *http.Request){
 
 	if utils.PassComp(hash, password){
 		fmt.Printf("siker")
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		
+		sessionToken := utils.GenToken(32)
+		csrfToken := utils.GenToken(32)
+
+		http.SetCookie(w, &http.Cookie{
+			Name: "session_token",
+			Value: sessionToken,
+			Expires: time.Now().Add(24*time.Hour),
+			HttpOnly: true,
+			Secure: true,
+		})
+
+		http.SetCookie(w, &http.Cookie{
+			Name: "csrf_token",
+			Value: csrfToken,
+			Expires: time.Now().Add(24*time.Hour),
+			HttpOnly: false,
+			Secure: true,
+		})
+
+		http.SetCookie(w, &http.Cookie{
+			Name: "user",
+			Value: name,
+			Expires: time.Now().Add(24*time.Hour),
+			HttpOnly: false,
+			Secure: true,
+		})
+		_, err := utils.DB.Exec("UPDATE users SET sessionToken = ? WHERE name = ?", sessionToken, name)
+		if err != nil {
+			log.Printf("UPDATE query failed with error: %v", err)
+			log.Printf("Error type: %T", err)
+			http.Error(w, fmt.Sprintf("Database update failed: %v", err), http.StatusInternalServerError)
+		}
+
+		_, err = utils.DB.Exec("UPDATE users SET csrfToken = ? WHERE name = ?", csrfToken, name)
+		if err != nil {
+			log.Printf("UPDATE query failed with error: %v", err)
+			log.Printf("Error type: %T", err)
+			http.Error(w, fmt.Sprintf("Database update failed: %v", err), http.StatusInternalServerError)
+		}
+	
+		http.Redirect(w, r, "/test", http.StatusSeeOther)
 	}else{
 		w.WriteHeader(http.StatusUnauthorized)
     	fmt.Fprintf(w, `<script>alert("Wrong username or password");window.history.back()</script>`)
