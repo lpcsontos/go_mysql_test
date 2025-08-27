@@ -51,6 +51,7 @@ func Login(w http.ResponseWriter, r *http.Request){
 	}
 
 	if utils.PassComp(hash, password){
+		fmt.Printf("siker")
 		
 		sessionToken := utils.GenToken(32)
 		csrfToken := utils.GenToken(32)
@@ -75,15 +76,17 @@ func Login(w http.ResponseWriter, r *http.Request){
 			Name: "user",
 			Value: name,
 			Expires: time.Now().Add(24*time.Hour),
-			HttpOnly: true,
+			HttpOnly: false,
 			Secure: true,
 		})
+		_, err := utils.DB.Exec("UPDATE users SET sessionToken = ? WHERE name = ?", sessionToken, name)
+		if err != nil {
+			log.Printf("UPDATE query failed with error: %v", err)
+			log.Printf("Error type: %T", err)
+			http.Error(w, fmt.Sprintf("Database update failed: %v", err), http.StatusInternalServerError)
+		}
 
-		dbQuery := `
-			INSERT INTO tokens (id, sessionToken, sessionExpires, csrfToken, csrfExpires)
-			Values ((SELECT id FROM users WHERE name = ?), ?, ?, ?, ?)
-		`
-		_, err := utils.DB.Exec(dbQuery, name, sessionToken, time.Now().Add(24*time.Hour), csrfToken, time.Now().Add(24*time.Hour))
+		_, err = utils.DB.Exec("UPDATE users SET csrfToken = ? WHERE name = ?", csrfToken, name)
 		if err != nil {
 			log.Printf("UPDATE query failed with error: %v", err)
 			log.Printf("Error type: %T", err)
